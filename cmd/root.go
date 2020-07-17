@@ -21,10 +21,16 @@ import (
 	_ "crypto/sha1"
 	_ "crypto/sha256"
 	_ "crypto/sha512"
+	"encoding/base32"
+	"encoding/base64"
 	"encoding/hex"
 	"fmt"
 	"github.com/spf13/cobra"
+	_ "golang.org/x/crypto/blake2b"
+	_ "golang.org/x/crypto/blake2s"
 	_ "golang.org/x/crypto/md4"
+	_ "golang.org/x/crypto/ripemd160"
+	_ "golang.org/x/crypto/sha3"
 	"io"
 	"io/ioutil"
 	"os"
@@ -34,6 +40,7 @@ import (
 var alg crypto.Hash
 var algorithmFlag string
 var recursiveFlag bool
+var baseFlag int
 
 const (
 	defaultAlgorithm = crypto.SHA256
@@ -46,17 +53,24 @@ var rootCmd = &cobra.Command{
 	Long: `Call gosum indicating algorithm desired.
 passing "*" as argument processes all files in current directory.
 
-Available algorithms. 
-	"md4":      crypto.MD4,
-	"md5":      crypto.MD5,
-	"sha1":     crypto.SHA1,
-	"sha256":   crypto.SHA256,
-	"sha2":     crypto.SHA256,
-	"sha384":   crypto.SHA384,
-	"sha512":   crypto.SHA256,
-	"sha3-256": crypto.SHA3_256,
-	"sha3-384": crypto.SHA3_384,
-	"sha3-512": crypto.SHA3_512,
+Available algorithms. quoted literal is expected flag value
+	"md4":         crypto.MD4,
+	"md5":         crypto.MD5,
+	"sha1":        crypto.SHA1,
+	"sha256":      crypto.SHA256,
+	"sha2":        crypto.SHA256,
+	"sha384":      crypto.SHA384,
+	"sha512":      crypto.SHA256,
+	"sha3-256":    crypto.SHA3_256,
+	"sha3-384":    crypto.SHA3_384,
+	"sha3-512":    crypto.SHA3_512,
+	"sha512-224":  crypto.SHA512_224,
+	"sha512-256":  crypto.SHA512_256,
+	"blake2s-256": crypto.BLAKE2s_256,
+	"blake2b-256": crypto.BLAKE2b_256,
+	"blake2b-384": crypto.BLAKE2b_384,
+	"blake2b-512": crypto.BLAKE2b_512,
+	"ripemd160":   crypto.RIPEMD160,
 
 	example:
 		gosum -a sha1 file1.txt file2.txt ...
@@ -65,8 +79,7 @@ Available algorithms.
 
 It is recommended to use quote literals when passing entire directories
 `,
-	// Uncomment the following line if your bare application
-	// has an action associated with it:
+
 	Args: func(cmd *cobra.Command, args []string) error {
 		if len(args) < 1 {
 			return fmt.Errorf("not enough arguments")
@@ -75,6 +88,9 @@ It is recommended to use quote literals when passing entire directories
 		alg, present = algorithms[algorithmFlag]
 		if !present {
 			return fmt.Errorf("algorithm %s not found", algorithmFlag)
+		}
+		if baseFlag != 16 && baseFlag != 64 && baseFlag != 32  {
+			return fmt.Errorf("unknown base %d. See help", baseFlag)
 		}
 		return nil
 	},
@@ -137,7 +153,14 @@ func runner(args []string) error {
 		if _, err := io.Copy(h, f); err != nil {
 			return err
 		}
-		hashes = append(hashes, hex.EncodeToString(h.Sum(nil)))
+		if baseFlag == 16 {
+			hashes = append(hashes, hex.EncodeToString(h.Sum(nil)))
+		} else if baseFlag == 64 {
+			hashes = append(hashes, base64Encode(h.Sum(nil)))
+		} else if baseFlag == 32 {
+			hashes = append(hashes, base32Encode(h.Sum(nil)))
+		}
+
 		names = append(names, f.Name())
 	}
 	fmt.Printf("%s job:\n", algorithmFlag)
@@ -157,20 +180,39 @@ func Execute() {
 }
 
 var algorithms = map[string]crypto.Hash{
-	"md4":      crypto.MD4,
-	"md5":      crypto.MD5,
-	"sha1":     crypto.SHA1,
-	"sha256":   crypto.SHA256,
-	"sha2":     crypto.SHA256,
-	"sha384":   crypto.SHA384,
-	"sha512":   crypto.SHA256,
-	"sha3-256": crypto.SHA3_256,
-	"sha3-384": crypto.SHA3_384,
-	"sha3-512": crypto.SHA3_512,
+	"md4":         crypto.MD4,
+	"md5":         crypto.MD5,
+	"sha1":        crypto.SHA1,
+	"sha256":      crypto.SHA256,
+	"sha2":        crypto.SHA256,
+	"sha384":      crypto.SHA384,
+	"sha512":      crypto.SHA256,
+	"sha3-256":    crypto.SHA3_256,
+	"sha3-384":    crypto.SHA3_384,
+	"sha3-512":    crypto.SHA3_512,
+	"sha512-224":  crypto.SHA512_224,
+	"sha512-256":  crypto.SHA512_256,
+	"blake2s-256": crypto.BLAKE2s_256,
+	"blake2b-256": crypto.BLAKE2b_256,
+	"blake2b-384": crypto.BLAKE2b_384,
+	"blake2b-512": crypto.BLAKE2b_512,
+	"ripemd160":   crypto.RIPEMD160,
 }
 
 func init() {
 	rootCmd.Flags().StringVarP(&algorithmFlag, "algorithm", "a", "sha256", "Algorithm used to compute hash. call help for all available")
 	rootCmd.Flags().BoolVarP(&recursiveFlag, "recursive", "r", false, "Recursive search in subdirectories. Needs \"*\" as argument")
+	rootCmd.Flags().IntVarP(&baseFlag, "base", "b",16,"Base of hash output. 16, 32 or 64 available")
 }
 
+func base64Encode(input []byte) (string) {
+	eb := make([]byte, base64.StdEncoding.EncodedLen(len(input)))
+	base64.StdEncoding.Encode(eb, input)
+	return string(eb)
+}
+
+func base32Encode(input []byte) (string) {
+	eb := make([]byte, base32.StdEncoding.EncodedLen(len(input)))
+	base32.StdEncoding.Encode(eb, input)
+	return string(eb)
+}
