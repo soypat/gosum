@@ -8,3 +8,6 @@ distr:
 
 mkbin:
 	mkdir bin
+
+snap:
+	go build ${buildflags} -o bin/${binname}

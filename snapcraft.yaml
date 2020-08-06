@@ -1,0 +1,23 @@
+name: gosum
+version: '1.0.0'
+summary: A checksumming tool.
+description: |
+  gosum provides easy hashing using common algorithms i.e.
+  SHA1, SHA2, SHA3, BLAKE, MD, RIPEMD
+
+confinement: devmode
+base: core18
+
+parts:
+  gosum:
+    plugin: go
+    go-importpath: github.com/soypat/gosum
+    source: https://github.com/soypat/gosum
+    source-type: git
+    build-packages:
+      - gcc
+
+apps:
+  gosum:
+    command: bin/gosum
+
